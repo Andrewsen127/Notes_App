@@ -4,7 +4,7 @@ This is a really simple Flask app I made for class to show how security works in
 
 ## 
 - Lets people log in as either a customer or an admin
-- Customers can write notes and they get stored encrypted so they aren’t sitting around in plain text
+- Customers can write notes and they get stored encrypted in my notes so they aren’t sitting around in plain text
 - Admins can log in and see everybody’s notes, while customers only see their own
 - Shows off least privilege because regular users don’t get admin powers
 

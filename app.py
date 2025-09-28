@@ -86,8 +86,8 @@ def my_notes():
     if "username" not in session:
         return redirect("/login")
     user_notes = notes.get(session["username"], [])
-    dec = [cipher.decrypt(n).decode() for n in user_notes]
-    return f"your notes: {dec}<br><a href='/'>back</a>"
+    #dec = [cipher.decrypt(n).decode() for n in user_notes]
+    return f"your encrypted notes: {user_notes}<br><a href='/'>back</a>"
 
 @app.route("/all_notes")
 @role_needed("admin")
