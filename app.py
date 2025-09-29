@@ -1,61 +1,61 @@
 from flask import Flask, request, session, redirect
-from functools import wraps
 from cryptography.fernet import Fernet
+from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = "secret123"  # basic session key, nothing fancy
+app.secret_key = "supersecret"
 
-# setup encryption (fernet = easy AES wrapper)
+# Generate a key for encryption/decryption
 key = Fernet.generate_key()
 cipher = Fernet(key)
 
-# fake "database" of users
+# In-memory storage (resets when app restarts)
+orders = {}
+
+# User database (demo only)
 users = {
     "andrew": {"password": "pass123", "role": "customer"},
     "diane": {"password": "admin123", "role": "admin"}
 }
 
-# store encrypted notes here
-notes = {}
-
-# helper function to block people who dont have the right role
+# Role-based access decorator
 def role_needed(role):
-    def wrapper(func):
-        @wraps(func)
-        def decorated(*args, **kwargs):
+    def wrapper(fn):
+        @wraps(fn)
+        def decorated_view(*args, **kwargs):
             if "username" not in session:
-                return "not logged in"
+                return redirect("/login")
             if session.get("role") != role:
-                return "oops, no access!"
-            return func(*args, **kwargs)
-        return decorated
+                return "Access denied!"
+            return fn(*args, **kwargs)
+        return decorated_view
     return wrapper
 
 @app.route("/")
 def home():
     if "username" in session:
         return f"Hi {session['username']} ({session['role']}) <br>" \
-               "<a href='/add_note'>add note</a> | " \
-               "<a href='/my_notes'>my notes</a> | " \
-               "<a href='/all_notes'>all notes (admin)</a> | " \
+               "<a href='/add_order'>add delivery instruction</a> | " \
+               "<a href='/my_orders'>my orders</a> | " \
+               "<a href='/all_orders'>all orders (admin)</a> | " \
                "<a href='/logout'>logout</a>"
-    return "Welcome, please <a href='/login'>login</a>"
+    return "Welcome to ShopEasy! Please <a href='/login'>login</a>"
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        uname = request.form.get("username")
-        pw = request.form.get("password")
-        user = users.get(uname)
-        if user and user["password"] == pw:
-            session["username"] = uname
+        username = request.form.get("username")
+        password = request.form.get("password")
+        user = users.get(username)
+        if user and user["password"] == password:
+            session["username"] = username
             session["role"] = user["role"]
             return redirect("/")
-        return "bad login"
+        return "Invalid credentials!"
     return '''
         <form method="post">
         Username: <input name="username"><br>
-        Password: <input name="password" type="password"><br>
+        Password: <input type="password" name="password"><br>
         <input type="submit" value="Login">
         </form>
     '''
@@ -65,36 +65,36 @@ def logout():
     session.clear()
     return redirect("/")
 
-@app.route("/add_note", methods=["GET", "POST"])
-def add_note():
+@app.route("/add_order", methods=["GET", "POST"])
+def add_order():
     if "username" not in session:
         return redirect("/login")
     if request.method == "POST":
-        note = request.form.get("note")
-        enc = cipher.encrypt(note.encode())  # encrypt before storing
-        notes.setdefault(session["username"], []).append(enc)
-        return "note saved!<br><a href='/'>back</a>"
+        instruction = request.form.get("instruction")
+        enc = cipher.encrypt(instruction.encode())  # encrypt before storing
+        orders.setdefault(session["username"], []).append(enc)
+        return "Delivery instruction saved!<br><a href='/'>back</a>"
     return '''
         <form method="post">
-        Note: <input name="note"><br>
+        Delivery Instruction: <input name="instruction"><br>
         <input type="submit" value="Save">
         </form>
     '''
 
-@app.route("/my_notes")
-def my_notes():
+@app.route("/my_orders")
+def my_orders():
     if "username" not in session:
         return redirect("/login")
-    user_notes = notes.get(session["username"], [])
-    #dec = [cipher.decrypt(n).decode() for n in user_notes]
-    return f"your encrypted notes: {user_notes}<br><a href='/'>back</a>"
+    user_orders = orders.get(session["username"], [])
+    # Customers only see the encrypted version of their instructions
+    return f"Your encrypted delivery instructions: {user_orders}<br><a href='/'>back</a>"
 
-@app.route("/all_notes")
+@app.route("/all_orders")
 @role_needed("admin")
-def all_notes():
+def all_orders():
     out = ""
-    for user, user_notes in notes.items():
-        dec = [cipher.decrypt(n).decode() for n in user_notes]
+    for user, user_orders in orders.items():
+        dec = [cipher.decrypt(o).decode() for o in user_orders]
         out += f"{user}: {dec}<br>"
     return out + "<br><a href='/'>back</a>"
 
